@@ -1,0 +1,1357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Broken Drawings Please!</title>
+    <!-- PeerJS Library for Real Online Peer-to-Peer Networking -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #1a1a2e;
+            --panel-bg: #16213e;
+            --accent-color: #e94560;
+            --text-color: #ffffff;
+            --border-color: #0f3460;
+            --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: var(--font-family);
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Top Bar */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 25px;
+            background-color: rgba(0, 0, 0, 0.2);
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .join-btn {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.1s, background 0.2s;
+        }
+
+        .join-btn:hover {
+            background-color: #ff5277;
+            transform: scale(1.03);
+        }
+
+        .ping-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0,0,0,0.4);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+        }
+
+        .ping-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: #2ecc71;
+        }
+
+        /* Main Layout */
+        .main-container {
+            display: flex;
+            flex: 1;
+            padding: 20px 30px;
+            gap: 25px;
+            justify-content: center;
+            align-items: stretch;
+            max-width: 1400px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        /* Lobby Layout */
+        .player-board {
+            flex: 1;
+            background-color: var(--panel-bg);
+            border: 3px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+        }
+
+        .panel-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .name-box {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid var(--border-color);
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .name-box input {
+            background: transparent;
+            border: none;
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+            width: 100%;
+            outline: none;
+        }
+
+        .name-box button {
+            background: var(--border-color);
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .name-box button:hover {
+            background: var(--accent-color);
+        }
+
+        .player-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            overflow-y: auto;
+        }
+
+        .player-item {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 12px 15px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-left: 4px solid var(--accent-color);
+        }
+
+        .player-item.host::after {
+            content: "HOST";
+            font-size: 10px;
+            background: var(--accent-color);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+
+        .player-item.done::after {
+            content: "READY";
+            font-size: 10px;
+            background: #2ecc71;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+
+        .player-item.you::before {
+            content: "(You) ";
+            color: #aaa;
+            font-size: 12px;
+        }
+
+        .game-settings {
+            flex: 2.5;
+            background-color: var(--panel-bg);
+            border: 3px solid var(--border-color);
+            border-radius: 12px;
+            padding: 25px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+        }
+
+        .lobby-code-section {
+            background: rgba(0, 0, 0, 0.25);
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .code-display {
+            font-size: 38px;
+            font-family: monospace;
+            font-weight: bold;
+            letter-spacing: 6px;
+            color: var(--accent-color);
+            margin: 10px 0;
+        }
+
+        .invite-btn {
+            background: transparent;
+            border: 1px solid var(--accent-color);
+            color: var(--text-color);
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .invite-btn:hover {
+            background: var(--accent-color);
+        }
+
+        .settings-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .setting-card {
+            background: rgba(255, 255, 255, 0.03);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .setting-card label {
+            display: block;
+            font-size: 14px;
+            margin-bottom: 8px;
+            color: #ccc;
+        }
+
+        .setting-card select {
+            width: 100%;
+            padding: 8px;
+            background: #0f3460;
+            border: none;
+            color: white;
+            border-radius: 4px;
+        }
+
+        .mode-description {
+            grid-column: span 2;
+            background: rgba(233, 69, 96, 0.1);
+            border: 1px solid var(--accent-color);
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 14px;
+            line-height: 1.5;
+            color: #ddd;
+        }
+
+        .mode-description ul {
+            margin-top: 8px;
+            padding-left: 20px;
+        }
+
+        .start-btn {
+            background-color: #2ecc71;
+            color: white;
+            border: none;
+            padding: 18px;
+            font-size: 22px;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            transition: background 0.2s, transform 0.1s;
+        }
+
+        .start-btn:hover {
+            background-color: #27ae60;
+            transform: translateY(-2px);
+        }
+
+        .start-btn:disabled {
+            background-color: #555;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* DRAWING CANVAS SCREEN */
+        .canvas-screen {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            gap: 15px;
+        }
+
+        .canvas-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--panel-bg);
+            padding: 12px 20px;
+            border-radius: 8px;
+            border: 2px solid var(--border-color);
+        }
+
+        .prompt-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #ffd700;
+        }
+
+        .timer-badge {
+            background: var(--accent-color);
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 18px;
+            min-width: 70px;
+            text-align: center;
+        }
+
+        .status-badge {
+            font-size: 13px;
+            color: #2ecc71;
+            font-weight: bold;
+        }
+
+        .canvas-workspace {
+            display: flex;
+            gap: 20px;
+            flex: 1;
+            align-items: stretch;
+            position: relative;
+        }
+
+        /* Toolbar */
+        .toolbar {
+            width: 240px;
+            background: var(--panel-bg);
+            border: 2px solid var(--border-color);
+            border-radius: 12px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            overflow-y: auto;
+        }
+
+        .tool-group-title {
+            font-size: 12px;
+            font-weight: bold;
+            color: #888;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+        }
+
+        .tool-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+        }
+
+        .tool-btn {
+            background: #0f3460;
+            border: 2px solid transparent;
+            color: white;
+            padding: 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            transition: all 0.1s;
+        }
+
+        .tool-btn:hover {
+            background: #1a4980;
+        }
+
+        .tool-btn.active {
+            border-color: var(--accent-color);
+            background: rgba(233, 69, 96, 0.2);
+            font-weight: bold;
+        }
+
+        .brush-slider-container {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .brush-slider-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            color: #ccc;
+        }
+
+        .color-picker-box {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .color-picker-box input[type="color"] {
+            -webkit-appearance: none;
+            border: none;
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            cursor: pointer;
+            background: transparent;
+        }
+
+        .color-picker-box input[type="color"]::-webkit-color-swatch-wrapper {
+            padding: 0;
+        }
+
+        .color-picker-box input[type="color"]::-webkit-color-swatch {
+            border: 2px solid #ffffff;
+            border-radius: 50%;
+        }
+
+        .swatch-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 6px;
+            margin-top: 8px;
+        }
+
+        .swatch {
+            width: 100%;
+            aspect-ratio: 1;
+            border-radius: 4px;
+            cursor: pointer;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .swatch:hover {
+            transform: scale(1.1);
+        }
+
+        /* Canvas Area */
+        .canvas-area {
+            flex: 1;
+            background: #0b0c10;
+            border: 2px solid var(--border-color);
+            border-radius: 12px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        #drawCanvas {
+            background: #ffffff;
+            border-radius: 6px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            cursor: crosshair;
+        }
+
+        #lassoCanvas {
+            position: absolute;
+            pointer-events: none;
+            border-radius: 6px;
+        }
+
+        .lasso-floating-actions {
+            position: absolute;
+            bottom: 25px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(22, 33, 62, 0.95);
+            border: 2px solid var(--accent-color);
+            padding: 8px 16px;
+            border-radius: 30px;
+            display: flex;
+            gap: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            z-index: 10;
+        }
+
+        .lasso-action-btn {
+            background: #0f3460;
+            border: none;
+            color: white;
+            padding: 6px 14px;
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .lasso-action-btn:hover {
+            background: var(--accent-color);
+        }
+
+        /* Overlay Screens */
+        .overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(10, 10, 20, 0.85);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .modal {
+            background: var(--panel-bg);
+            border: 2px solid var(--accent-color);
+            padding: 30px;
+            border-radius: 12px;
+            text-align: center;
+            width: 380px;
+            box-shadow: 0 0 30px rgba(233, 69, 96, 0.3);
+        }
+
+        .modal input {
+            width: 100%;
+            padding: 12px;
+            font-size: 18px;
+            text-align: center;
+            font-family: monospace;
+            letter-spacing: 2px;
+            margin-bottom: 15px;
+            background: #0f3460;
+            border: 1px solid var(--border-color);
+            color: white;
+            border-radius: 6px;
+        }
+
+        .error-msg {
+            color: #e74c3c;
+            font-size: 13px;
+            margin-bottom: 10px;
+            display: none;
+        }
+
+        /* Waiting Screen Overlay */
+        .waiting-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(16, 21, 30, 0.92);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 20;
+            border-radius: 12px;
+        }
+
+        .spinner {
+            border: 4px solid rgba(255,255,255,0.1);
+            border-left-color: var(--accent-color);
+            border-radius: 50%;
+            width: 48px;
+            height: 48px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header -->
+    <header>
+        <div class="header-left">
+            <button class="join-btn" onclick="openJoinModal()">Enter Code to Join Lobby</button>
+            <span style="font-weight: bold; font-size: 18px;">Broken Drawings Please!</span>
+        </div>
+        <div class="ping-indicator">
+            <div id="ping-dot" class="ping-dot"></div>
+            <span id="ping-text">Connecting...</span>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="main-container">
+        
+        <!-- SCREEN 1: LOBBY UI -->
+        <div id="lobby-screen" style="display: flex; gap: 25px; width: 100%;">
+            <section class="player-board">
+                <div class="panel-title">
+                    Players (<span id="player-count">1</span>/12)
+                </div>
+
+                <div class="name-box">
+                    <input type="text" id="username-input" value="Player1" maxlength="12" placeholder="Your Name">
+                    <button onclick="updateName()">Save Name</button>
+                </div>
+
+                <ul id="player-list" class="player-list">
+                    <!-- Dynamic List -->
+                </ul>
+            </section>
+
+            <section class="game-settings">
+                <div>
+                    <div class="lobby-code-section">
+                        <span style="font-size: 14px; color: #aaa;">YOUR ROOM CODE</span>
+                        <div id="room-code-display" class="code-display">CONNECTING...</div>
+                        <button class="invite-btn" onclick="copyInviteLink()">Copy Invite Link</button>
+                    </div>
+
+                    <div class="panel-title">Game Settings</div>
+                    <div class="settings-grid">
+                        <div class="setting-card">
+                            <label for="gamemode">Selected Mode</label>
+                            <select id="gamemode" disabled>
+                                <option selected>Simple (Distortion Chain)</option>
+                            </select>
+                        </div>
+
+                        <div class="setting-card">
+                            <label for="draw-time">Draw Time Limit</label>
+                            <select id="draw-time" onchange="broadcastSettings()">
+                                <option value="30">30 Seconds</option>
+                                <option value="45">45 Seconds</option>
+                                <option value="60" selected>60 Seconds</option>
+                                <option value="90">90 Seconds</option>
+                            </select>
+                        </div>
+
+                        <div class="mode-description">
+                            <strong style="color: var(--accent-color);">Game Flow Rules:</strong>
+                            <ul>
+                                <li>Every player gets a dynamic countdown timer for each round.</li>
+                                <li>Submitting locks your drawing and flags you as <strong>READY</strong>.</li>
+                                <li><strong>Auto-Advance:</strong> Once every player submits, the game immediately moves to the next round!</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <button id="start-btn" class="start-btn" onclick="startGame()">Start Game</button>
+            </section>
+        </div>
+
+        <!-- SCREEN 2: DRAWING CANVAS STUDIO -->
+        <div id="canvas-screen" class="canvas-screen hidden">
+            <div class="canvas-header">
+                <div>
+                    <span style="color: #888; font-size: 12px; text-transform: uppercase;">YOUR PROMPT:</span>
+                    <div class="prompt-title" id="canvas-prompt-display">"Loading prompt..."</div>
+                </div>
+                <div class="timer-badge" id="canvas-timer">60s</div>
+                <div id="submission-status" class="status-badge">Drawing in progress...</div>
+                <button id="submit-draw-btn" class="join-btn" style="background: #2ecc71;" onclick="userSubmitDrawing()">Submit Drawing</button>
+            </div>
+
+            <div class="canvas-workspace">
+                <!-- Toolbar -->
+                <div class="toolbar">
+                    <div>
+                        <div class="tool-group-title">Tools</div>
+                        <div class="tool-grid">
+                            <button class="tool-btn active" id="tool-brush" onclick="setTool('brush')">✏️ Pen</button>
+                            <button class="tool-btn" id="tool-eraser" onclick="setTool('eraser')">🧹 Eraser</button>
+                            <button class="tool-btn" id="tool-bucket" onclick="setTool('bucket')">🪣 Bucket</button>
+                            <button class="tool-btn" id="tool-lasso" onclick="setTool('lasso')">🪢 Lasso</button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="tool-group-title">Shapes & Lines</div>
+                        <div class="tool-grid">
+                            <button class="tool-btn" id="tool-line" onclick="setTool('line')">📏 Line</button>
+                            <button class="tool-btn" id="tool-rect" onclick="setTool('rect')">🔲 Rect</button>
+                            <button class="tool-btn" id="tool-circle" onclick="setTool('circle')">⭕ Circle</button>
+                            <button class="tool-btn" onclick="clearCanvas()">🗑️ Clear</button>
+                        </div>
+                    </div>
+
+                    <div class="brush-slider-container">
+                        <div class="brush-slider-header">
+                            <span>Brush Size</span>
+                            <span id="brush-size-text">8px</span>
+                        </div>
+                        <input type="range" id="brush-size" min="1" max="60" value="8" oninput="updateBrushSize(this.value)">
+                    </div>
+
+                    <div>
+                        <div class="tool-group-title">Color Palette</div>
+                        <div class="color-picker-box">
+                            <input type="color" id="primary-color" value="#000000" onchange="setColor(this.value)">
+                            <span style="font-size: 13px; font-weight: bold;" id="color-hex-text">#000000</span>
+                        </div>
+                        <div class="swatch-grid">
+                            <div class="swatch" style="background: #000000;" onclick="setColor('#000000')"></div>
+                            <div class="swatch" style="background: #ffffff;" onclick="setColor('#ffffff')"></div>
+                            <div class="swatch" style="background: #e74c3c;" onclick="setColor('#e74c3c')"></div>
+                            <div class="swatch" style="background: #e67e22;" onclick="setColor('#e67e22')"></div>
+                            <div class="swatch" style="background: #f1c40f;" onclick="setColor('#f1c40f')"></div>
+                            <div class="swatch" style="background: #2ecc71;" onclick="setColor('#2ecc71')"></div>
+                            <div class="swatch" style="background: #1abc9c;" onclick="setColor('#1abc9c')"></div>
+                            <div class="swatch" style="background: #3498db;" onclick="setColor('#3498db')"></div>
+                            <div class="swatch" style="background: #9b59b6;" onclick="setColor('#9b59b6')"></div>
+                            <div class="swatch" style="background: #e94560;" onclick="setColor('#e94560')"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Canvas Workspace -->
+                <div class="canvas-area">
+                    <canvas id="drawCanvas" width="800" height="600"></canvas>
+                    <canvas id="lassoCanvas" width="800" height="600"></canvas>
+
+                    <!-- Floating Lasso Controls -->
+                    <div id="lasso-controls" class="lasso-floating-actions hidden">
+                        <button class="lasso-action-btn" onclick="fillLassoSelection()">Fill Color</button>
+                        <button class="lasso-action-btn" onclick="clearLassoSelection()">Delete Area</button>
+                        <button class="lasso-action-btn" onclick="clearLassoPath()">Deselect</button>
+                    </div>
+
+                    <!-- Waiting Overlay for Submitted Players -->
+                    <div id="waiting-overlay" class="waiting-overlay hidden">
+                        <div class="spinner"></div>
+                        <h2 style="margin-bottom: 6px;">Drawing Submitted!</h2>
+                        <p style="color: #aaa; font-size: 14px;">Waiting for other players to finish...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Join Code Modal -->
+    <div id="join-modal" class="overlay hidden">
+        <div class="modal">
+            <h2>Join Room</h2>
+            <p style="font-size: 14px; margin-bottom: 15px; color: #ccc;">Enter an active 8-digit host code</p>
+            <input type="text" id="join-input" maxlength="8" placeholder="E.G. 8A3F19B2">
+            <div id="join-error" class="error-msg">Room not found or offline! Check code.</div>
+            <button id="modal-join-btn" class="join-btn" style="width: 100%; padding: 12px;" onclick="submitJoinCode()">Join Room</button>
+            <button style="background: transparent; border: none; color: #aaa; margin-top: 10px; cursor: pointer;" onclick="closeJoinModal()">Cancel</button>
+        </div>
+    </div>
+
+    <script>
+        // Networking & Lobby Variables
+        let peer = null;
+        let connections = [];
+        let hostConnection = null;
+        let isHost = true;
+        let roomCode = "";
+        let myName = "Player" + Math.floor(1000 + Math.random() * 9000);
+        let players = [];
+
+        // Game Loop Variables
+        let currentRound = 1;
+        let timeLimit = 60;
+        let remainingTime = 60;
+        let timerInterval = null;
+        let hasSubmittedCurrentRound = false;
+        let roundSubmissions = {}; // Tracks finished players for current round
+
+        // Canvas Engine Variables
+        let canvas, ctx;
+        let lassoCanvas, lassoCtx;
+        let currentTool = 'brush';
+        let currentColor = '#000000';
+        let currentBrushSize = 8;
+        let isDrawing = false;
+        let startX = 0, startY = 0;
+        let canvasSnapshot = null;
+        let lassoPoints = [];
+
+        const usernameInput = document.getElementById('username-input');
+        usernameInput.value = myName;
+
+        window.onload = () => {
+            roomCode = generateRoomCode();
+            initPeer(roomCode);
+            startPingMonitor();
+            initCanvasEngine();
+        };
+
+        function generateRoomCode() {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            let code = '';
+            for (let i = 0; i < 8; i++) {
+                code += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return code;
+        }
+
+        /* --- LOBBY & NETWORKING LOGIC --- */
+        function initPeer(customId) {
+            peer = new Peer("BDP-" + customId);
+
+            peer.on('open', (id) => {
+                document.getElementById('room-code-display').innerText = customId;
+                if (isHost) {
+                    players = [{ id: peer.id, peerId: peer.id, name: myName, isHost: true, isDone: false }];
+                    renderPlayers();
+                }
+            });
+
+            peer.on('connection', (conn) => {
+                if (!isHost) return;
+                conn.on('open', () => { connections.push(conn); });
+                conn.on('data', (data) => { handleDataAsHost(data, conn); });
+                conn.on('close', () => {
+                    connections = connections.filter(c => c !== conn);
+                    players = players.filter(p => p.peerId !== conn.peer);
+                    broadcastToGuests({ type: 'PLAYER_LIST', players: players });
+                    renderPlayers();
+                    checkAllPlayersDone();
+                });
+            });
+
+            peer.on('error', (err) => {
+                if (err.type === 'peer-unavailable') {
+                    showJoinError("Room code does not exist or host is offline!");
+                }
+            });
+        }
+
+        function handleDataAsHost(data, conn) {
+            if (data.type === 'JOIN_REQUEST') {
+                const newPlayer = { id: conn.peer, peerId: conn.peer, name: data.name, isHost: false, isDone: false };
+                players.push(newPlayer);
+                conn.send({ type: 'JOIN_SUCCESS', roomCode: roomCode, players: players });
+                broadcastToGuests({ type: 'PLAYER_LIST', players: players });
+                renderPlayers();
+            } else if (data.type === 'NAME_CHANGE') {
+                const player = players.find(p => p.peerId === conn.peer);
+                if (player) player.name = data.newName;
+                broadcastToGuests({ type: 'PLAYER_LIST', players: players });
+                renderPlayers();
+            } else if (data.type === 'SUBMIT_DRAWING') {
+                roundSubmissions[conn.peer] = data.image;
+                const player = players.find(p => p.peerId === conn.peer);
+                if (player) player.isDone = true;
+                broadcastToGuests({ type: 'PLAYER_LIST', players: players });
+                checkAllPlayersDone();
+            }
+        }
+
+        function handleDataAsGuest(data) {
+            if (data.type === 'JOIN_SUCCESS') {
+                closeJoinModal();
+                isHost = false;
+                roomCode = data.roomCode;
+                document.getElementById('room-code-display').innerText = roomCode;
+                document.getElementById('start-btn').disabled = true;
+                document.getElementById('start-btn').innerText = "Waiting for Host...";
+                document.getElementById('draw-time').disabled = true;
+            } else if (data.type === 'PLAYER_LIST') {
+                players = data.players;
+                renderPlayers();
+            } else if (data.type === 'SETTINGS_CHANGE') {
+                document.getElementById('draw-time').value = data.drawTime;
+            } else if (data.type === 'START_ROUND') {
+                timeLimit = parseInt(data.drawTime);
+                startRoundUI(data.round, data.prompt);
+            }
+        }
+
+        function submitJoinCode() {
+            const codeInput = document.getElementById('join-input').value.trim().toUpperCase();
+            if (codeInput.length !== 8) {
+                showJoinError("Code must be 8 characters long!");
+                return;
+            }
+            document.getElementById('modal-join-btn').innerText = "Connecting...";
+            hideJoinError();
+            hostConnection = peer.connect("BDP-" + codeInput);
+
+            hostConnection.on('open', () => { hostConnection.send({ type: 'JOIN_REQUEST', name: myName }); });
+            hostConnection.on('data', (data) => { handleDataAsGuest(data); });
+        }
+
+        function updateName() {
+            const newName = usernameInput.value.trim();
+            if (!newName) return;
+            myName = newName;
+            if (isHost) {
+                players[0].name = myName;
+                broadcastToGuests({ type: 'PLAYER_LIST', players: players });
+                renderPlayers();
+            } else if (hostConnection) {
+                hostConnection.send({ type: 'NAME_CHANGE', newName: myName });
+            }
+        }
+
+        function renderPlayers() {
+            const playerListUI = document.getElementById('player-list');
+            playerListUI.innerHTML = "";
+            document.getElementById('player-count').innerText = players.length;
+
+            players.forEach(p => {
+                const li = document.createElement('li');
+                let classes = "player-item";
+                if (p.isHost) classes += " host";
+                if (p.isDone) classes += " done";
+                if (p.name === myName) classes += " you";
+                li.className = classes;
+                li.innerText = p.name;
+                playerListUI.appendChild(li);
+            });
+        }
+
+        function broadcastToGuests(data) {
+            connections.forEach(conn => { if (conn.open) conn.send(data); });
+        }
+
+        function broadcastSettings() {
+            if (!isHost) return;
+            timeLimit = parseInt(document.getElementById('draw-time').value);
+            broadcastToGuests({ type: 'SETTINGS_CHANGE', drawTime: timeLimit });
+        }
+
+        /* --- GAME & TIMER ENGINE --- */
+        function startGame() {
+            if (!isHost) return;
+            currentRound = 1;
+            timeLimit = parseInt(document.getElementById('draw-time').value);
+            initiateNextRound();
+        }
+
+        function initiateNextRound() {
+            roundSubmissions = {};
+            players.forEach(p => p.isDone = false);
+            broadcastToGuests({ type: 'PLAYER_LIST', players: players });
+
+            const samplePrompts = [
+                "A cat playing a broken electric guitar",
+                "A giant robot drinking boba tea",
+                "A clumsy wizard spilling a magic potion",
+                "An astronaut walking a dog on Mars"
+            ];
+            const currentPrompt = samplePrompts[Math.floor(Math.random() * samplePrompts.length)];
+
+            broadcastToGuests({
+                type: 'START_ROUND',
+                round: currentRound,
+                prompt: currentPrompt,
+                drawTime: timeLimit
+            });
+
+            startRoundUI(currentRound, currentPrompt);
+        }
+
+        function startRoundUI(roundNum, promptText) {
+            document.getElementById('lobby-screen').classList.add('hidden');
+            document.getElementById('canvas-screen').classList.remove('hidden');
+            document.getElementById('waiting-overlay').classList.add('hidden');
+
+            document.getElementById('canvas-prompt-display').innerText = `"${promptText}"`;
+            document.getElementById('submission-status').innerText = "Drawing in progress...";
+            document.getElementById('submission-status').style.color = "#2ecc71";
+            document.getElementById('submit-draw-btn').disabled = false;
+
+            hasSubmittedCurrentRound = false;
+            clearCanvas();
+            startTimer(timeLimit);
+        }
+
+        function startTimer(durationSeconds) {
+            clearInterval(timerInterval);
+            remainingTime = durationSeconds;
+            updateTimerDisplay();
+
+            timerInterval = setInterval(() => {
+                remainingTime--;
+                updateTimerDisplay();
+
+                if (remainingTime <= 0) {
+                    clearInterval(timerInterval);
+                    if (!hasSubmittedCurrentRound) {
+                        userSubmitDrawing(); // Force automatic submission on timeout
+                    }
+                }
+            }, 1000);
+        }
+
+        function updateTimerDisplay() {
+            document.getElementById('canvas-timer').innerText = remainingTime + "s";
+        }
+
+        function userSubmitDrawing() {
+            if (hasSubmittedCurrentRound) return;
+            hasSubmittedCurrentRound = true;
+
+            const drawingData = canvas.toDataURL();
+            document.getElementById('waiting-overlay').classList.remove('hidden');
+            document.getElementById('submission-status').innerText = "Submitted!";
+            document.getElementById('submission-status').style.color = "#ffd700";
+            document.getElementById('submit-draw-btn').disabled = true;
+
+            if (isHost) {
+                roundSubmissions[peer.id] = drawingData;
+                const me = players.find(p => p.peerId === peer.id);
+                if (me) me.isDone = true;
+                broadcastToGuests({ type: 'PLAYER_LIST', players: players });
+                checkAllPlayersDone();
+            } else if (hostConnection) {
+                hostConnection.send({ type: 'SUBMIT_DRAWING', image: drawingData });
+            }
+        }
+
+        function checkAllPlayersDone() {
+            if (!isHost) return;
+            const totalPlayers = players.length;
+            const completedCount = Object.keys(roundSubmissions).length;
+
+            if (completedCount >= totalPlayers) {
+                clearInterval(timerInterval);
+                setTimeout(() => {
+                    alert(`Round ${currentRound} Complete! All players submitted.`);
+                    currentRound++;
+                    initiateNextRound();
+                }, 1000);
+            }
+        }
+
+        /* --- CANVAS DRAWING TOOLKIT --- */
+        function initCanvasEngine() {
+            canvas = document.getElementById('drawCanvas');
+            ctx = canvas.getContext('2d', { willReadFrequently: true });
+            lassoCanvas = document.getElementById('lassoCanvas');
+            lassoCtx = lassoCanvas.getContext('2d');
+
+            canvas.addEventListener('mousedown', startDrawing);
+            canvas.addEventListener('mousemove', draw);
+            canvas.addEventListener('mouseup', stopDrawing);
+            canvas.addEventListener('mouseleave', stopDrawing);
+
+            clearCanvas();
+        }
+
+        function setTool(toolName) {
+            currentTool = toolName;
+            document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
+            const activeBtn = document.getElementById('tool-' + toolName);
+            if (activeBtn) activeBtn.classList.add('active');
+
+            if (toolName !== 'lasso') {
+                clearLassoPath();
+            }
+        }
+
+        function setColor(hex) {
+            currentColor = hex;
+            document.getElementById('primary-color').value = hex;
+            document.getElementById('color-hex-text').innerText = hex.toUpperCase();
+            if (currentTool === 'eraser') setTool('brush');
+        }
+
+        function updateBrushSize(size) {
+            currentBrushSize = parseInt(size);
+            document.getElementById('brush-size-text').innerText = size + "px";
+        }
+
+        function clearCanvas() {
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            clearLassoPath();
+        }
+
+        function getCanvasCoords(e) {
+            const rect = canvas.getBoundingClientRect();
+            return {
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top
+            };
+        }
+
+        function startDrawing(e) {
+            if (hasSubmittedCurrentRound) return;
+            const coords = getCanvasCoords(e);
+            isDrawing = true;
+            startX = coords.x;
+            startY = coords.y;
+
+            if (currentTool === 'brush' || currentTool === 'eraser') {
+                ctx.beginPath();
+                ctx.moveTo(coords.x, coords.y);
+                ctx.strokeStyle = (currentTool === 'eraser') ? '#ffffff' : currentColor;
+                ctx.lineWidth = currentBrushSize;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+            } else if (['line', 'rect', 'circle'].includes(currentTool)) {
+                canvasSnapshot = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            } else if (currentTool === 'bucket') {
+                floodFill(Math.floor(coords.x), Math.floor(coords.y), hexToRgb(currentColor));
+                isDrawing = false;
+            } else if (currentTool === 'lasso') {
+                clearLassoPath();
+                lassoPoints = [{ x: coords.x, y: coords.y }];
+            }
+        }
+
+        function draw(e) {
+            if (!isDrawing || hasSubmittedCurrentRound) return;
+            const coords = getCanvasCoords(e);
+
+            if (currentTool === 'brush' || currentTool === 'eraser') {
+                ctx.lineTo(coords.x, coords.y);
+                ctx.stroke();
+            } else if (['line', 'rect', 'circle'].includes(currentTool)) {
+                ctx.putImageData(canvasSnapshot, 0, 0);
+                ctx.beginPath();
+                ctx.strokeStyle = currentColor;
+                ctx.lineWidth = currentBrushSize;
+                ctx.lineCap = 'round';
+
+                if (currentTool === 'line') {
+                    ctx.moveTo(startX, startY);
+                    ctx.lineTo(coords.x, coords.y);
+                    ctx.stroke();
+                } else if (currentTool === 'rect') {
+                    ctx.strokeRect(startX, startY, coords.x - startX, coords.y - startY);
+                } else if (currentTool === 'circle') {
+                    const radius = Math.hypot(coords.x - startX, coords.y - startY);
+                    ctx.arc(startX, startY, radius, 0, 2 * Math.PI);
+                    ctx.stroke();
+                }
+            } else if (currentTool === 'lasso') {
+                lassoPoints.push({ x: coords.x, y: coords.y });
+                drawLassoMarquee();
+            }
+        }
+
+        function stopDrawing() {
+            if (!isDrawing) return;
+            isDrawing = false;
+
+            if (currentTool === 'lasso' && lassoPoints.length > 2) {
+                document.getElementById('lasso-controls').classList.remove('hidden');
+            }
+        }
+
+        /* --- LASSO & BUCKET FILL ALGORITHMS --- */
+        function drawLassoMarquee() {
+            lassoCtx.clearRect(0, 0, lassoCanvas.width, lassoCanvas.height);
+            if (lassoPoints.length < 2) return;
+
+            lassoCtx.beginPath();
+            lassoCtx.moveTo(lassoPoints[0].x, lassoPoints[0].y);
+            for (let i = 1; i < lassoPoints.length; i++) {
+                lassoCtx.lineTo(lassoPoints[i].x, lassoPoints[i].y);
+            }
+            lassoCtx.closePath();
+            lassoCtx.strokeStyle = '#e94560';
+            lassoCtx.lineWidth = 2;
+            lassoCtx.setLineDash([6, 6]);
+            lassoCtx.stroke();
+        }
+
+        function clearLassoPath() {
+            lassoPoints = [];
+            lassoCtx.clearRect(0, 0, lassoCanvas.width, lassoCanvas.height);
+            document.getElementById('lasso-controls').classList.add('hidden');
+        }
+
+        function fillLassoSelection() {
+            if (lassoPoints.length < 3) return;
+            ctx.beginPath();
+            ctx.moveTo(lassoPoints[0].x, lassoPoints[0].y);
+            for (let i = 1; i < lassoPoints.length; i++) {
+                ctx.lineTo(lassoPoints[i].x, lassoPoints[i].y);
+            }
+            ctx.closePath();
+            ctx.fillStyle = currentColor;
+            ctx.fill();
+            clearLassoPath();
+        }
+
+        function clearLassoSelection() {
+            if (lassoPoints.length < 3) return;
+            ctx.beginPath();
+            ctx.moveTo(lassoPoints[0].x, lassoPoints[0].y);
+            for (let i = 1; i < lassoPoints.length; i++) {
+                ctx.lineTo(lassoPoints[i].x, lassoPoints[i].y);
+            }
+            ctx.closePath();
+            ctx.fillStyle = '#ffffff';
+            ctx.fill();
+            clearLassoPath();
+        }
+
+        function floodFill(startX, startY, fillColor) {
+            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imgData.data;
+            const targetColor = getPixelColor(data, startX, startY);
+
+            if (colorsMatch(targetColor, fillColor)) return;
+
+            const pixelStack = [[startX, startY]];
+            const width = canvas.width;
+            const height = canvas.height;
+
+            while (pixelStack.length) {
+                const newPos = pixelStack.pop();
+                const x = newPos[0];
+                let y = newPos[1];
+
+                let pixelPos = (y * width + x) * 4;
+                while (y >= 0 && colorsMatch(getPixelColorAtPos(data, pixelPos), targetColor)) {
+                    y--;
+                    pixelPos -= width * 4;
+                }
+                pixelPos += width * 4;
+                y++;
+
+                let reachLeft = false;
+                let reachRight = false;
+
+                while (y < height && colorsMatch(getPixelColorAtPos(data, pixelPos), targetColor)) {
+                    setPixelColorAtPos(data, pixelPos, fillColor);
+
+                    if (x > 0) {
+                        if (colorsMatch(getPixelColorAtPos(data, pixelPos - 4), targetColor)) {
+                            if (!reachLeft) {
+                                pixelStack.push([x - 1, y]);
+                                reachLeft = true;
+                            }
+                        } else if (reachLeft) {
+                            reachLeft = false;
+                        }
+                    }
+
+                    if (x < width - 1) {
+                        if (colorsMatch(getPixelColorAtPos(data, pixelPos + 4), targetColor)) {
+                            if (!reachRight) {
+                                pixelStack.push([x + 1, y]);
+                                reachRight = true;
+                            }
+                        } else if (reachRight) {
+                            reachRight = false;
+                        }
+                    }
+
+                    y++;
+                    pixelPos += width * 4;
+                }
+            }
+            ctx.putImageData(imgData, 0, 0);
+        }
+
+        function getPixelColor(data, x, y) {
+            const index = (y * canvas.width + x) * 4;
+            return [data[index], data[index + 1], data[index + 2], data[index + 3]];
+        }
+
+        function getPixelColorAtPos(data, pos) {
+            return [data[pos], data[pos + 1], data[pos + 2], data[pos + 3]];
+        }
+
+        function setPixelColorAtPos(data, pos, color) {
+            data[pos] = color.r;
+            data[pos + 1] = color.g;
+            data[pos + 2] = color.b;
+            data[pos + 3] = 255;
+        }
+
+        function colorsMatch(c1, c2) {
+            if (Array.isArray(c2)) {
+                return c1[0] === c2[0] && c1[1] === c2[1] && c1[2] === c2[2] && c1[3] === c2[3];
+            }
+            return c1[0] === c2.r && c1[1] === c2.g && c1[2] === c2.b;
+        }
+
+        function hexToRgb(hex) {
+            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? {
+                r: parseInt(result[1], 16),
+                g: parseInt(result[2], 16),
+                b: parseInt(result[3], 16)
+            } : { r: 0, g: 0, b: 0 };
+        }
+
+        /* --- UI MODAL HELPERS --- */
+        function showJoinError(msg) {
+            const err = document.getElementById('join-error');
+            err.innerText = msg;
+            err.style.display = 'block';
+            document.getElementById('modal-join-btn').innerText = "Join Room";
+        }
+
+        function hideJoinError() {
+            document.getElementById('join-error').style.display = 'none';
+        }
+
+        function openJoinModal() {
+            document.getElementById('join-modal').classList.remove('hidden');
+        }
+
+        function closeJoinModal() {
+            document.getElementById('join-modal').classList.add('hidden');
+            hideJoinError();
+        }
+
+        function copyInviteLink() {
+            navigator.clipboard.writeText(roomCode);
+            alert("Copied room code: " + roomCode);
+        }
+
+        function startPingMonitor() {
+            setInterval(() => {
+                const pingText = document.getElementById('ping-text');
+                const pingDot = document.getElementById('ping-dot');
+                if (peer && !peer.disconnected) {
+                    pingText.innerText = "Online";
+                    pingText.style.color = "#2ecc71";
+                    pingDot.style.backgroundColor = "#2ecc71";
+                } else {
+                    pingText.innerText = "Offline";
+                    pingText.style.color = "#e74c3c";
+                    pingDot.style.backgroundColor = "#e74c3c";
+                }
+            }, 2000);
+        }
+    </script>
+</body>
+</html>
